@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # 1. Servidor Web: Apache + PHP + Apache Exporter (tu miapp completa)
+  web:
+    build: .
+    container_name: servidor-web-docker
+    ports:
+      - "8080:80"     # Apache -> http://localhost:8080
+      - "9117:9117"   # Métricas del Apache Exporter
+    volumes:
+      - ./src:/var/www/miapp   # Tus archivos PHP/HTML (Actividad 8 vivirá aquí)
+    depends_on:
+      - db
+    restart: always
+
+  # 2. Base de datos: recrea miapp_db, miapp_user y la tabla usuarios (Actividad 7)
+  db:
+    image: mariadb:10.6
+    container_name: mariadb_db
+    environment:
+      MYSQL_ROOT_PASSWORD: RootPassword123!
+      MYSQL_DATABASE: miapp_db
+    volumes:
+      - ./db-init:/docker-entrypoint-initdb.d   # Se ejecuta solo la primera vez
+      - db_data:/var/lib/mysql                  # Persistencia de datos
+    ports:
+      - "3306:3306"
+    restart: always
+
+  # 3. Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus_server
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    restart: always
+
+  # 4. Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana_server
+    ports:
+      - "3000:3000"   # admin / admin por defecto
+    restart: always
+
+  # 5. Node Exporter (Métricas del SO: CPU, RAM, Disco, Red)
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node_exporter
+    ports:
+      - "9100:9100"
+    restart: always
+
+volumes:
+  db_data:
