@@ -1,8 +1,8 @@
 CREATE DATABASE IF NOT EXISTS miapp_db;
 
-CREATE USER IF NOT EXISTS 'miapp_user'@'%' IDENTIFIED BY 'ClaveSegura123!';
-GRANT SELECT, INSERT, UPDATE, DELETE ON miapp_db.* TO 'miapp_user'@'%';
-FLUSH PRIVILEGES;
+--CREATE USER IF NOT EXISTS 'miapp_user'@'%' IDENTIFIED BY 'ClaveSegura123!';
+--GRANT SELECT, INSERT, UPDATE, DELETE ON miapp_db.* TO 'miapp_user'@'%';
+--FLUSH PRIVILEGES;
 
 USE miapp_db;
 
