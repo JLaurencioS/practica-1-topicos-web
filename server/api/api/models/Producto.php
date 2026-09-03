@@ -85,10 +85,11 @@ class Producto
     // Verifica si el SKU ya existe (útil para validar antes de crear/actualizar)
     public function skuExists()
     {
-        $query = "SELECT id FROM " . $this->table_name . " WHERE sku = :sku LIMIT 1";
+        $query = "SELECT id FROM " . $this->table_name . " WHERE sku = :sku";
         if (!empty($this->id)) {
             $query .= " AND id != :id";
         }
+        $query .= " LIMIT 1";
 
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(":sku", $this->sku);

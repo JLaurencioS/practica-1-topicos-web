@@ -1,146 +1,191 @@
 <?php
-class Producto
+
+require_once '../config/database.php';
+require_once '../models/Producto.php';
+
+class ProductoResource
 {
-    private $conn;
-    private $table_name = "productos";
+    private $db;
+    private $producto;
 
-    public $id;
-    public $sku;
-    public $name;
-    public $description;
-    public $price;
-    public $stock;
-    public $created_at;
-    public $updated_at;
-
-    public function __construct($db)
+    public function __construct()
     {
-        $this->conn = $db;
+        $database = new Database();
+        $this->db = $database->getConnection();
+        $this->producto = new Producto($this->db);
     }
 
-    public function create()
+    private function formatProducto($p)
     {
-        $query = "INSERT INTO " . $this->table_name . " 
-                  SET sku=:sku, name=:name, description=:description, 
-                      price=:price, stock=:stock";
-
-        $stmt = $this->conn->prepare($query);
-
-        $this->sku = htmlspecialchars(strip_tags($this->sku));
-        $this->name = htmlspecialchars(strip_tags($this->name));
-        $this->description = htmlspecialchars(strip_tags($this->description));
-        $this->price = floatval($this->price);
-        $this->stock = intval($this->stock);
-
-        $stmt->bindParam(":sku", $this->sku);
-        $stmt->bindParam(":name", $this->name);
-        $stmt->bindParam(":description", $this->description);
-        $stmt->bindParam(":price", $this->price);
-        $stmt->bindParam(":stock", $this->stock);
-
-        if ($stmt->execute()) {
-            $this->id = $this->conn->lastInsertId();
-            return true;
-        }
-        return false;
+        return array(
+            "id" => (int) $p['id'],
+            "sku" => $p['sku'],
+            "name" => $p['name'],
+            "description" => $p['description'],
+            "price" => (float) $p['price'],
+            "stock" => (int) $p['stock'],
+            "created_at" => $p['created_at'],
+            "updated_at" => $p['updated_at']
+        );
     }
 
-    public function read()
+    // GET /api/v1/productos
+    public function index()
     {
-        $query = "SELECT id, sku, name, description, price, stock, created_at, updated_at 
-                  FROM " . $this->table_name . " 
-                  ORDER BY created_at DESC";
+        header("Content-Type: application/json");
 
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-        return $stmt;
+        $stmt = $this->producto->read();
+        $num = $stmt->rowCount();
+
+        $productos_arr = array("records" => array());
+
+        if ($num > 0) {
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                array_push($productos_arr["records"], $this->formatProducto($row));
+            }
+        }
+
+        http_response_code(200);
+        echo json_encode($productos_arr);
     }
 
-    public function readOne()
+    // GET /api/v1/productos/{id}
+    public function show($id)
     {
-        $query = "SELECT id, sku, name, description, price, stock, created_at, updated_at 
-                  FROM " . $this->table_name . " 
-                  WHERE id = :id 
-                  LIMIT 1";
+        header("Content-Type: application/json");
 
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(":id", $this->id);
-        $stmt->execute();
+        $this->producto->id = $id;
 
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($this->producto->readOne()) {
+            $row = array(
+                'id' => $this->producto->id,
+                'sku' => $this->producto->sku,
+                'name' => $this->producto->name,
+                'description' => $this->producto->description,
+                'price' => $this->producto->price,
+                'stock' => $this->producto->stock,
+                'created_at' => $this->producto->created_at,
+                'updated_at' => $this->producto->updated_at
+            );
 
-        if ($row) {
-            $this->sku = $row['sku'];
-            $this->name = $row['name'];
-            $this->description = $row['description'];
-            $this->price = $row['price'];
-            $this->stock = $row['stock'];
-            $this->created_at = $row['created_at'];
-            $this->updated_at = $row['updated_at'];
-            return true;
+            http_response_code(200);
+            echo json_encode($this->formatProducto($row));
+        } else {
+            http_response_code(404);
+            echo json_encode(array("message" => "Producto no encontrado"));
         }
-        return false;
     }
 
-    // Verifica si el SKU ya existe (útil para validar antes de crear/actualizar)
-    public function skuExists()
+    // POST /api/v1/productos
+    public function store()
     {
-        $query = "SELECT id FROM " . $this->table_name . " WHERE sku = :sku LIMIT 1";
-        if (!empty($this->id)) {
-            $query .= " AND id != :id";
+        header("Content-Type: application/json");
+
+        $data = json_decode(file_get_contents("php://input"));
+
+        if (empty($data->sku) || empty($data->name) || !isset($data->price)) {
+            http_response_code(400);
+            echo json_encode(array("message" => "Datos incompletos (sku, name y price son requeridos)"));
+            return;
         }
 
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(":sku", $this->sku);
-        if (!empty($this->id)) {
-            $stmt->bindParam(":id", $this->id);
-        }
-        $stmt->execute();
+        $this->producto->sku = $data->sku;
+        $this->producto->name = $data->name;
+        $this->producto->description = $data->description ?? null;
+        $this->producto->price = $data->price;
+        $this->producto->stock = $data->stock ?? 0;
 
-        return $stmt->rowCount() > 0;
+        if ($this->producto->skuExists()) {
+            http_response_code(409);
+            echo json_encode(array("message" => "El SKU ya está en uso"));
+            return;
+        }
+
+        try {
+            if ($this->producto->create()) {
+                http_response_code(201);
+                echo json_encode(array(
+                    "message" => "Producto creado exitosamente",
+                    "id" => $this->producto->id
+                ));
+            } else {
+                http_response_code(503);
+                echo json_encode(array("message" => "No se pudo crear el producto"));
+            }
+        } catch (PDOException $e) {
+            http_response_code(409);
+            echo json_encode(array("message" => "El SKU ya está en uso"));
+        }
     }
 
-    public function update()
+    // PUT /api/v1/productos/{id}
+    public function update($id)
     {
-        $query = "UPDATE " . $this->table_name . " 
-                  SET sku = :sku, name = :name, description = :description, 
-                      price = :price, stock = :stock 
-                  WHERE id = :id";
+        header("Content-Type: application/json");
 
-        $stmt = $this->conn->prepare($query);
+        $data = json_decode(file_get_contents("php://input"));
 
-        $this->sku = htmlspecialchars(strip_tags($this->sku));
-        $this->name = htmlspecialchars(strip_tags($this->name));
-        $this->description = htmlspecialchars(strip_tags($this->description));
-        $this->price = floatval($this->price);
-        $this->stock = intval($this->stock);
-        $this->id = htmlspecialchars(strip_tags($this->id));
+        $this->producto->id = $id;
 
-        $stmt->bindParam(':sku', $this->sku);
-        $stmt->bindParam(':name', $this->name);
-        $stmt->bindParam(':description', $this->description);
-        $stmt->bindParam(':price', $this->price);
-        $stmt->bindParam(':stock', $this->stock);
-        $stmt->bindParam(':id', $this->id);
-
-        if ($stmt->execute()) {
-            return true;
+        if (empty($data->sku) || empty($data->name) || !isset($data->price)) {
+            http_response_code(400);
+            echo json_encode(array("message" => "Datos incompletos (sku, name y price son requeridos)"));
+            return;
         }
-        return false;
+
+        // Verificar que el producto exista
+        if (!$this->producto->readOne()) {
+            http_response_code(404);
+            echo json_encode(array("message" => "Producto no encontrado"));
+            return;
+        }
+
+        $this->producto->sku = $data->sku;
+        $this->producto->name = $data->name;
+        $this->producto->description = $data->description ?? null;
+        $this->producto->price = $data->price;
+        $this->producto->stock = $data->stock ?? 0;
+
+        if ($this->producto->skuExists()) {
+            http_response_code(409);
+            echo json_encode(array("message" => "El SKU ya está en uso por otro producto"));
+            return;
+        }
+
+        try {
+            if ($this->producto->update()) {
+                http_response_code(200);
+                echo json_encode(array("message" => "Producto actualizado exitosamente"));
+            } else {
+                http_response_code(503);
+                echo json_encode(array("message" => "No se pudo actualizar el producto"));
+            }
+        } catch (PDOException $e) {
+            http_response_code(409);
+            echo json_encode(array("message" => "El SKU ya está en uso por otro producto"));
+        }
     }
 
-    public function delete()
+    // DELETE /api/v1/productos/{id}
+    public function destroy($id)
     {
-        $query = "DELETE FROM " . $this->table_name . " WHERE id = :id";
+        header("Content-Type: application/json");
 
-        $stmt = $this->conn->prepare($query);
-        $this->id = htmlspecialchars(strip_tags($this->id));
-        $stmt->bindParam(':id', $this->id);
+        $this->producto->id = $id;
 
-        if ($stmt->execute()) {
-            return true;
+        if (!$this->producto->readOne()) {
+            http_response_code(404);
+            echo json_encode(array("message" => "Producto no encontrado"));
+            return;
         }
-        return false;
+
+        if ($this->producto->delete()) {
+            http_response_code(200);
+            echo json_encode(array("message" => "Producto eliminado exitosamente"));
+        } else {
+            http_response_code(503);
+            echo json_encode(array("message" => "No se pudo eliminar el producto"));
+        }
     }
 }
 ?>
