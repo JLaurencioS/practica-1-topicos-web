@@ -2,7 +2,7 @@
 class User
 {
     private $conn;
-    private $table_name = "users";
+    private $table_name = "usuarios";
 
     public $id;
     public $name;
@@ -17,7 +17,7 @@ class User
     public function create()
     {
         $query = "INSERT INTO " . $this->table_name . " 
-                  SET name=:name, email=:email, created_at=:created_at";
+                  SET nombre=:name, email=:email, fecha_registro=:created_at";
 
         $stmt = $this->conn->prepare($query);
 
@@ -38,9 +38,9 @@ class User
 
     public function read()
     {
-        $query = "SELECT id, name, email, created_at 
+        $query = "SELECT id, nombre, email, fecha_registro 
                   FROM " . $this->table_name . " 
-                  ORDER BY created_at DESC";
+                  ORDER BY fecha_registro DESC";
 
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
@@ -49,7 +49,7 @@ class User
 
     public function readOne()
     {
-        $query = "SELECT id, name, email, created_at 
+        $query = "SELECT id, nombre, email, fecha_registro 
                   FROM " . $this->table_name . " 
                   WHERE id = :id 
                   LIMIT 1";
@@ -61,9 +61,9 @@ class User
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($row) {
-            $this->name = $row['name'];
+            $this->name = $row['nombre'];
             $this->email = $row['email'];
-            $this->created_at = $row['created_at'];
+            $this->created_at = $row['fecha_registro'];
             return true;
         }
         return false;
@@ -72,7 +72,7 @@ class User
     public function update()
     {
         $query = "UPDATE " . $this->table_name . " 
-                  SET name = :name, email = :email 
+                  SET nombre = :name, email = :email 
                   WHERE id = :id";
 
         $stmt = $this->conn->prepare($query);
