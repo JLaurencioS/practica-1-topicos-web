@@ -1,7 +1,7 @@
 <?php
 
-require_once '../config/database.php';
-require_once '../models/User.php';
+require_once '../../config/database.php';
+require_once '../../models/User.php';
 
 class UserResource
 {

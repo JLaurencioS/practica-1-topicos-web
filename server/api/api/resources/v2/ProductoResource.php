@@ -1,7 +1,7 @@
 <?php
 
-require_once '../config/database.php';
-require_once '../models/Producto.php';
+require_once '../../config/database.php';
+require_once '../../models/Producto.php';
 
 class ProductoResource
 {
