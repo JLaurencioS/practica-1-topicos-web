@@ -11,12 +11,13 @@ class Router
         $this->basePath = rtrim($basePath, '/');
     }
 
-    public function addRoute($method, $path, $handler)
+    public function addRoute($method, $path, $handler, $protected = false)
     {
         $this->routes[] = [
             'method' => strtoupper($method),
             'path' => "/api/{$this->version}" . $path,
-            'handler' => $handler
+            'handler' => $handler,
+            'protected' => $protected
         ];
     }
 
@@ -29,6 +30,10 @@ class Router
             $uri = substr($uri, strlen($this->basePath));
         }
 
+        if (strpos($uri, '/index.php') === 0) {
+            $uri = substr($uri, strlen('/index.php'));
+        }
+
         // Asegurar que la URI comience con 
         $uri = '/' . ltrim($uri, '/');
 
@@ -38,6 +43,21 @@ class Router
 
             if ($route['method'] === $method && preg_match($pattern, $uri, $matches)) {
                 array_shift($matches);
+                
+                if ($route['protected']) {
+                    require_once __DIR__ . '/AuthMiddleware.php';
+
+                    if (!AuthMiddleware::check()) {
+                        http_response_code(401);
+                        header("Content-Type: application/json");
+                        echo json_encode(array(
+                            "error" => "unauthorized",
+                            "message" => "Token inválido, expirado o no proporcionado"
+                        ));
+                        return;
+                    }
+                }
+
                 return call_user_func_array($route['handler'], $matches);
             }
         }
