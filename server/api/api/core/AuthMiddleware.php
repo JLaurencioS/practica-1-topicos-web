@@ -39,8 +39,14 @@ class AuthMiddleware
             $headers = getallheaders();
         }
 
-        if (!$headers && isset($_SERVER['HTTP_AUTHORIZATION'])) {
-            $headers = ['Authorization' => $_SERVER['HTTP_AUTHORIZATION']];
+        // Fallback por si getallheaders() no está disponible en este entorno
+        if (!$headers) {
+            if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+                $headers = ['Authorization' => $_SERVER['HTTP_AUTHORIZATION']];
+            } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+                // Fallback: algunos hosting compartidos lo exponen con este prefijo
+                $headers = ['Authorization' => $_SERVER['REDIRECT_HTTP_AUTHORIZATION']];
+            }
         }
 
         if (!$headers) {
